@@ -22,12 +22,31 @@ pub mod JsonParser
     
     pub enum JsonValue
     {
-        Map(HashMap<String, JsonValue>),
-        Vector(Vec<JsonValue>),
+        Dict(HashMap<String, JsonValue>),
+        List(Vec<JsonValue>),
         Bool(bool),
         Double(f32),
         String(String),
         Null,
+    }
+
+    impl JsonValue
+    {
+        fn insert_map(&self, key: String, value: JsonValue) -> Result<(), &'static str>
+        {
+            match &self
+            {
+                JsonValue::Dict(map) =>
+                {
+                    map.insert(key, value);
+                    Ok(());
+                },
+                _ =>
+                {
+                    Err("Cannot insert in a map if JsonValue is not Dict type");
+                }
+            }
+        }
     }
 
     fn getFileContent(file_path: String) -> Result<String, Box<dyn Error>>
@@ -38,7 +57,7 @@ pub mod JsonParser
 
     fn parseMap(file_path: String) -> Result<JsonValue, &'static str>
     {
-
+        let return_map = JsonValue::Dict(HashMap::new());
     }
 
     fn parseVec(file_path: String) -> Result<JsonValue, &'static str>
