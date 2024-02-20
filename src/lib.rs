@@ -25,7 +25,8 @@ pub mod JsonParser
         Dict(HashMap<String, JsonValue>),
         List(Vec<JsonValue>),
         Bool(bool),
-        Double(f32),
+        Int(i64),
+        Double(f64),
         String(String),
         Null,
     }
@@ -147,6 +148,43 @@ pub mod JsonParser
         }
     }
 
+    fn parseStrValue(mut value_str: String) -> Result<String, &'static str>
+    {
+        match value_str.remove(0)
+        {
+            '\"' =>
+            {
+                let mut value = String::new();
+                while value_str.len() > 0 && !value_str.starts_with('\"')
+                {
+                    value.push(value_str.remove(0));
+                }
+                if value_str.len() == 0
+                {
+                    return Err("Wrong format for str value");
+                }
+                Ok(value)
+            }
+            '\'' =>
+            {
+                let mut value = String::new();
+                while value_str.len() > 0 && !value_str.starts_with('\'')
+                {
+                    value.push(value_str.remove(0));
+                }
+                if value_str.len() == 0
+                {
+                    return Err("Wrong format for str value");
+                }
+                Ok(value)
+            }
+            _ =>
+            {
+                Err("Wrong format for str value")
+            }
+        }
+    }
+
     fn parseMap(mut file_content: String) -> Result<(String, JsonValue), &'static str>
     {
         let return_map = JsonValue::Dict(HashMap::new());
@@ -171,7 +209,73 @@ pub mod JsonParser
                 }
                 _ =>
                 {
+                    let mut value_str = String::new();
+                    while file_content.len() > 0 && !file_content.starts_with(",") && !file_content.starts_with("}")
+                    {
+                        value_str.push(file_content.remove(0));
+                    }
 
+                    if file_content.len() == 0
+                    {
+                        return Err("Wrong Dict format");
+                    }
+
+                    match value_str.as_str()
+                    {
+                        "null" =>
+                        {
+                            return_map.insert_map(key, JsonValue::Null);
+                        },
+                        "true" =>
+                        {
+                            return_map.insert_map(key, JsonValue::Bool(true));
+                        }
+                        "false" =>
+                        {
+                            return_map.insert_map(key, JsonValue::Bool(false));
+                        }
+                        _ =>
+                        {
+                            if value_str.as_bytes()[0] == b'\'' || value_str.as_bytes()[0] == b'\"'
+                            {
+                                let value = JsonValue::String(parseStrValue(value_str)?);
+                                return_map.insert_map(key, value);
+                            }
+                            else
+                            {
+                                match value_str.parse::<i64>()
+                                {
+                                    Ok(v) => 
+                                    {
+                                        return_map.insert_map(key, JsonValue::Int(v));
+                                    },
+                                    Err(_) =>
+                                    {
+                                        match value_str.parse::<f64>()
+                                        {
+                                            Ok(v) =>
+                                            {
+                                                return_map.insert_map(key, JsonValue::Double(v));
+                                            },
+                                            Err(_) =>
+                                            {
+                                                return Err("Wrong value format");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    match file_content.remove(0)
+                    {
+                        ',' => {},
+                        '}' => 
+                        {
+                            break;
+                        }
+                    }
                 }
             }
         }
