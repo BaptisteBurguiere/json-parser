@@ -1,20 +1,4 @@
-// pub fn add(left: usize, right: usize) -> usize {
-//     left + right
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
-
-
-pub mod JsonParser
+pub mod json_parser
 {
     use std::collections::HashMap;
     use std::fs;
@@ -33,7 +17,7 @@ pub mod JsonParser
 
     impl JsonValue
     {
-        fn insert_map(&mut self, key: String, value: JsonValue) -> Result<(), &'static str>
+        pub fn insert_map(&mut self, key: String, value: JsonValue) -> Result<(), &'static str>
         {
             match self
             {
@@ -46,7 +30,7 @@ pub mod JsonParser
             }
         }
 
-        fn insert_vec(&mut self, value: JsonValue) -> Result<(), &'static str>
+        pub fn insert_vec(&mut self, value: JsonValue) -> Result<(), &'static str>
         {
             match self
             {
@@ -58,9 +42,83 @@ pub mod JsonParser
                 _ => Err("Cannot insert in a vector if JsonValue is not List type")
             }
         }
+
+        fn list_to_string(vec: Vec<JsonValue>) -> Result<String, &'static str>
+        {
+            let mut return_str = String::from("[");
+
+            for elt in vec
+            {
+                let elt_str = elt.to_string()?;
+                return_str.push_str(&elt_str);
+                return_str.push(',');
+            }
+            return_str.remove(return_str.len() - 1);
+            return_str.push(']');
+
+            Ok(return_str)
+        }
+
+        fn dict_to_string(map: HashMap<String, JsonValue>) -> Result<String, &'static str>
+        {
+            let mut return_str = String::from("{");
+
+            for (key, value) in map
+            {
+                let mut key_str = String::from("\"");
+                key_str.push_str(&key);
+                key_str.push('\"');
+
+                return_str.push_str(&key_str);
+                return_str.push(':');
+
+                let value_str = value.to_string()?;
+                return_str.push_str(&value_str);
+                return_str.push(',');
+            }
+            return_str.remove(return_str.len() - 1);
+            return_str.push('}');
+
+            Ok(return_str)
+        }
+
+        pub fn to_string(self) -> Result<String, &'static str>
+        {
+            match self
+            {
+                JsonValue::Null => {
+                    Ok(String::from("null"))
+                },
+                JsonValue::Bool(value) => {
+                    Ok(value.to_string())
+                },
+                JsonValue::Int(value) => {
+                    Ok(value.to_string())
+                },
+                JsonValue::Double(value) => {
+                    Ok(value.to_string())
+                },
+                JsonValue::String(value) => {
+                    let mut value_str = String::from("\"");
+                    value_str.push_str(&value);
+                    value_str.push('\"');
+                    Ok(value_str)
+                },
+                JsonValue::List(vec) => {
+                    let vec_str = Self::list_to_string(vec)?;
+                    Ok(vec_str)
+                },
+                JsonValue::Dict(map) =>
+                {
+                    let map_str = Self::dict_to_string(map)?;
+                    Ok(map_str)
+                },
+                _ => Err("Invalid value")
+            }
+        }
     }
 
-    fn getFileContent(file_path: String) -> Result<String, Box<dyn Error>>
+    fn get_file_content(file_path: String) -> Result<String, Box<dyn Error>>
     {
         let mut file_content = fs::read_to_string(file_path)?;
         file_content.trim();
@@ -99,7 +157,7 @@ pub mod JsonParser
         Ok(return_str)
     }
 
-    fn parseKey(mut file_content: String) -> Result<(String, String), &'static str>
+    fn parse_key(mut file_content: String) -> Result<(String, String), &'static str>
     {
         match file_content.remove(0)
         {
@@ -148,7 +206,7 @@ pub mod JsonParser
         }
     }
 
-    fn parseStrValue(mut value_str: String) -> Result<String, &'static str>
+    fn parse_str_value(mut value_str: String) -> Result<String, &'static str>
     {
         match value_str.remove(0)
         {
@@ -185,20 +243,20 @@ pub mod JsonParser
         }
     }
 
-    fn parseValue(mut file_content: String, end_char: char) -> Result<(String, JsonValue), &'static str>
+    fn parse_value(mut file_content: String, end_char: char) -> Result<(String, JsonValue), &'static str>
     {
         match file_content.as_bytes()[0]
         {
             b'{' =>
             {
                 let mut value = JsonValue::Dict(HashMap::new());
-                (file_content, value) = parseMap(file_content)?;
+                (file_content, value) = parse_map(file_content)?;
                 Ok((file_content, value))
             }
             b'[' =>
             {
                 let mut value = JsonValue::List(Vec::new());
-                (file_content, value) = parseVec(file_content)?;
+                (file_content, value) = parse_vec(file_content)?;
                 Ok((file_content, value))
             }
             _ =>
@@ -232,7 +290,7 @@ pub mod JsonParser
                     {
                         if value_str.as_bytes()[0] == b'\'' || value_str.as_bytes()[0] == b'\"'
                         {
-                            let value = JsonValue::String(parseStrValue(value_str)?);
+                            let value = JsonValue::String(parse_str_value(value_str)?);
                             Ok((file_content, value))
                         }
                         else
@@ -265,7 +323,7 @@ pub mod JsonParser
         }
     }
 
-    fn parseMap(mut file_content: String) -> Result<(String, JsonValue), &'static str>
+    fn parse_map(mut file_content: String) -> Result<(String, JsonValue), &'static str>
     {
         let mut return_map = JsonValue::Dict(HashMap::new());
         file_content.remove(0);
@@ -273,10 +331,10 @@ pub mod JsonParser
         loop
         {
             let mut key = String::new();
-            (file_content, key) = parseKey(file_content)?;
+            (file_content, key) = parse_key(file_content)?;
 
             let mut value = JsonValue::Null;
-            (file_content, value) = parseValue(file_content, '}')?;
+            (file_content, value) = parse_value(file_content, '}')?;
 
             return_map.insert_map(key, value);
 
@@ -297,7 +355,7 @@ pub mod JsonParser
         Ok((file_content, return_map))
     }
 
-    fn parseVec(mut file_content: String) -> Result<(String, JsonValue), &'static str>
+    fn parse_vec(mut file_content: String) -> Result<(String, JsonValue), &'static str>
     {
         let mut return_vec = JsonValue::List(Vec::new());
         file_content.remove(0);
@@ -305,7 +363,7 @@ pub mod JsonParser
         loop
         {
             let mut value = JsonValue::Null;
-            (file_content, value) = parseValue(file_content, ']')?;
+            (file_content, value) = parse_value(file_content, ']')?;
 
             return_vec.insert_vec(value);
 
@@ -328,7 +386,7 @@ pub mod JsonParser
 
     pub fn parse(file_path: String) -> Result<JsonValue, Box<dyn Error>>
     {
-        let mut file_content = getFileContent(file_path)?;
+        let mut file_content = get_file_content(file_path)?;
 
         let json_obj: JsonValue;
 
@@ -336,11 +394,11 @@ pub mod JsonParser
         {
             b'{' =>
             {
-                (file_content, json_obj) = parseMap(file_content)?;
+                (file_content, json_obj) = parse_map(file_content)?;
             }
             b'[' =>
             {
-                (file_content, json_obj) = parseVec(file_content)?;
+                (file_content, json_obj) = parse_vec(file_content)?;
             }
             _ =>
             {
