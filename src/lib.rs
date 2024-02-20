@@ -33,9 +33,9 @@ pub mod JsonParser
 
     impl JsonValue
     {
-        fn insert_map(&self, key: String, value: JsonValue) -> Result<(), &'static str>
+        fn insert_map(&mut self, key: String, value: JsonValue) -> Result<(), &'static str>
         {
-            match &self
+            match self
             {
                 JsonValue::Dict(map) =>
                 {
@@ -46,9 +46,9 @@ pub mod JsonParser
             }
         }
 
-        fn insert_vec(&self, value: JsonValue) -> Result<(), &'static str>
+        fn insert_vec(&mut self, value: JsonValue) -> Result<(), &'static str>
         {
-            match &self
+            match self
             {
                 JsonValue::List(vec) =>
                 {
@@ -185,9 +185,89 @@ pub mod JsonParser
         }
     }
 
+    fn parseValue(mut file_content: String, end_char: char) -> Result<(String, JsonValue), &'static str>
+    {
+        match file_content.as_bytes()[0]
+        {
+            b'{' =>
+            {
+                let mut value = JsonValue::Dict(HashMap::new());
+                (file_content, value) = parseMap(file_content)?;
+                Ok((file_content, value))
+            }
+            b'[' =>
+            {
+                let mut value = JsonValue::List(Vec::new());
+                (file_content, value) = parseVec(file_content)?;
+                Ok((file_content, value))
+            }
+            _ =>
+            {
+                let mut value_str = String::new();
+                while file_content.len() > 0 && !file_content.starts_with(",") && !file_content.starts_with(end_char)
+                {
+                    value_str.push(file_content.remove(0));
+                }
+
+                if file_content.len() == 0
+                {
+                    return Err("Wrong Dict format");
+                }
+
+                match value_str.as_str()
+                {
+                    "null" =>
+                    {
+                        Ok((file_content, JsonValue::Null))
+                    },
+                    "true" =>
+                    {
+                        Ok((file_content, JsonValue::Bool(true)))
+                    }
+                    "false" =>
+                    {
+                        Ok((file_content, JsonValue::Bool(false)))
+                    }
+                    _ =>
+                    {
+                        if value_str.as_bytes()[0] == b'\'' || value_str.as_bytes()[0] == b'\"'
+                        {
+                            let value = JsonValue::String(parseStrValue(value_str)?);
+                            Ok((file_content, value))
+                        }
+                        else
+                        {
+                            match value_str.parse::<i64>()
+                            {
+                                Ok(v) => 
+                                {
+                                    Ok((file_content, JsonValue::Int(v)))
+                                },
+                                Err(_) =>
+                                {
+                                    match value_str.parse::<f64>()
+                                    {
+                                        Ok(v) =>
+                                        {
+                                            Ok((file_content, JsonValue::Double(v)))
+                                        },
+                                        Err(_) =>
+                                        {
+                                            Err("Wrong value format")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn parseMap(mut file_content: String) -> Result<(String, JsonValue), &'static str>
     {
-        let return_map = JsonValue::Dict(HashMap::new());
+        let mut return_map = JsonValue::Dict(HashMap::new());
         file_content.remove(0);
 
         loop
@@ -195,87 +275,21 @@ pub mod JsonParser
             let mut key = String::new();
             (file_content, key) = parseKey(file_content)?;
 
-            match file_content.as_bytes()[0]
+            let mut value = JsonValue::Null;
+            (file_content, value) = parseValue(file_content, '}')?;
+
+            return_map.insert_map(key, value);
+
+            match file_content.remove(0)
             {
-                b'{' =>
+                ',' => {},
+                '}' => 
                 {
-                    let value = JsonValue::Dict(HashMap::new());
-                    return_map.insert_map(key, value);
-                }
-                b'[' =>
-                {
-                    let value = JsonValue::List(Vec::new());
-                    return_map.insert_map(key, value);
-                }
+                    break;
+                },
                 _ =>
                 {
-                    let mut value_str = String::new();
-                    while file_content.len() > 0 && !file_content.starts_with(",") && !file_content.starts_with("}")
-                    {
-                        value_str.push(file_content.remove(0));
-                    }
-
-                    if file_content.len() == 0
-                    {
-                        return Err("Wrong Dict format");
-                    }
-
-                    match value_str.as_str()
-                    {
-                        "null" =>
-                        {
-                            return_map.insert_map(key, JsonValue::Null);
-                        },
-                        "true" =>
-                        {
-                            return_map.insert_map(key, JsonValue::Bool(true));
-                        }
-                        "false" =>
-                        {
-                            return_map.insert_map(key, JsonValue::Bool(false));
-                        }
-                        _ =>
-                        {
-                            if value_str.as_bytes()[0] == b'\'' || value_str.as_bytes()[0] == b'\"'
-                            {
-                                let value = JsonValue::String(parseStrValue(value_str)?);
-                                return_map.insert_map(key, value);
-                            }
-                            else
-                            {
-                                match value_str.parse::<i64>()
-                                {
-                                    Ok(v) => 
-                                    {
-                                        return_map.insert_map(key, JsonValue::Int(v));
-                                    },
-                                    Err(_) =>
-                                    {
-                                        match value_str.parse::<f64>()
-                                        {
-                                            Ok(v) =>
-                                            {
-                                                return_map.insert_map(key, JsonValue::Double(v));
-                                            },
-                                            Err(_) =>
-                                            {
-                                                return Err("Wrong value format");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    match file_content.remove(0)
-                    {
-                        ',' => {},
-                        '}' => 
-                        {
-                            break;
-                        }
-                    }
+                    return Err("Wrong format for type Dict");
                 }
             }
         }
@@ -283,24 +297,55 @@ pub mod JsonParser
         Ok((file_content, return_map))
     }
 
-    fn parseVec(file_content: String) -> Result<(String, JsonValue), &'static str>
+    fn parseVec(mut file_content: String) -> Result<(String, JsonValue), &'static str>
     {
-        
+        let mut return_vec = JsonValue::List(Vec::new());
+        file_content.remove(0);
+
+        loop
+        {
+            let mut value = JsonValue::Null;
+            (file_content, value) = parseValue(file_content, ']')?;
+
+            return_vec.insert_vec(value);
+
+            match file_content.remove(0)
+            {
+                ',' => {},
+                ']' => 
+                {
+                    break;
+                },
+                _ =>
+                {
+                    return Err("Wrong format for type List");
+                }
+            }
+        }
+
+        Ok((file_content, return_vec))
     }
 
     pub fn parse(file_path: String) -> Result<JsonValue, Box<dyn Error>>
     {
         let mut file_content = getFileContent(file_path)?;
 
-        let mut json_obj: JsonValue;
+        let json_obj: JsonValue;
 
-        if file_content.starts_with("{")
+        match file_content.as_bytes()[0]
         {
-            (file_content, json_obj) = parseMap(file_content)?;
-        }
-        else if file_content.starts_with("[")
-        {
-            (file_content, json_obj) = parseVec(file_content)?;
+            b'{' =>
+            {
+                (file_content, json_obj) = parseMap(file_content)?;
+            }
+            b'[' =>
+            {
+                (file_content, json_obj) = parseVec(file_content)?;
+            }
+            _ =>
+            {
+                return Err("Wrong Json format".into());
+            }
         }
 
         Ok(json_obj)
