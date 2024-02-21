@@ -113,7 +113,28 @@ pub mod json_parser
                     let map_str = Self::dict_to_string(map)?;
                     Ok(map_str)
                 },
-                _ => Err("Invalid value")
+            }
+        }
+
+        pub fn get_map(&self, key: &String) -> Result<Option<&JsonValue>, &'static str>
+        {
+            match self
+            {
+                JsonValue::Dict(map) => {
+                    Ok(map.get(key))
+                }
+                _ => Err("JsonValue is not Dict type")
+            }
+        }
+
+        pub fn get_vec(&self, index: usize) -> Result<Option<&JsonValue>, &'static str>
+        {
+            match self
+            {
+                JsonValue::List(vec) => {
+                    Ok(vec.get(index))
+                }
+                _ => Err("JsonValue is not List type")
             }
         }
     }
@@ -121,7 +142,7 @@ pub mod json_parser
     fn get_file_content(file_path: String) -> Result<String, Box<dyn Error>>
     {
         let mut file_content = fs::read_to_string(file_path)?;
-        file_content.trim();
+        file_content = String::from(file_content.trim());
 
         let mut return_str = String::new();
         while file_content.len() > 0
@@ -336,7 +357,7 @@ pub mod json_parser
             let mut value = JsonValue::Null;
             (file_content, value) = parse_value(file_content, '}')?;
 
-            return_map.insert_map(key, value);
+            return_map.insert_map(key, value)?;
 
             match file_content.remove(0)
             {
@@ -365,7 +386,7 @@ pub mod json_parser
             let mut value = JsonValue::Null;
             (file_content, value) = parse_value(file_content, ']')?;
 
-            return_vec.insert_vec(value);
+            return_vec.insert_vec(value)?;
 
             match file_content.remove(0)
             {
@@ -386,7 +407,7 @@ pub mod json_parser
 
     pub fn parse(file_path: String) -> Result<JsonValue, Box<dyn Error>>
     {
-        let mut file_content = get_file_content(file_path)?;
+        let file_content = get_file_content(file_path)?;
 
         let json_obj: JsonValue;
 
@@ -394,11 +415,11 @@ pub mod json_parser
         {
             b'{' =>
             {
-                (file_content, json_obj) = parse_map(file_content)?;
+                (_, json_obj) = parse_map(file_content)?;
             }
             b'[' =>
             {
-                (file_content, json_obj) = parse_vec(file_content)?;
+                (_, json_obj) = parse_vec(file_content)?;
             }
             _ =>
             {
