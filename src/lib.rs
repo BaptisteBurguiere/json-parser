@@ -183,7 +183,7 @@ fn parse_key(mut file_content: String) -> Result<(String, String), &'static str>
         '\"' =>
         {
             let mut key = String::new();
-            while file_content.len() > 0 && file_content.starts_with("\"")
+            while file_content.len() > 0 && !file_content.starts_with("\"")
             {
                 key.push(file_content.remove(0));
             }
@@ -202,7 +202,7 @@ fn parse_key(mut file_content: String) -> Result<(String, String), &'static str>
         '\'' =>
         {
             let mut key = String::new();
-            while file_content.len() > 0 && file_content.starts_with("\'")
+            while file_content.len() > 0 && !file_content.starts_with("\'")
             {
                 key.push(file_content.remove(0));
             }
