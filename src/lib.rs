@@ -13,6 +13,24 @@ pub enum JsonValue
     Null,
 }
 
+impl PartialEq for JsonValue
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        match (self, other)
+        {
+            (JsonValue::Dict(map1), JsonValue::Dict(map2)) => map1 == map2,
+            (JsonValue::List(vec1), JsonValue::List(vec2)) => vec1 == vec2,
+            (JsonValue::Bool(b1), JsonValue::Bool(b2)) => b1 == b2,
+            (JsonValue::Int(i1), JsonValue::Int(i2)) => i1 == i2,
+            (JsonValue::Double(d1), JsonValue::Double(d2)) => d1 == d2,
+            (JsonValue::String(s1), JsonValue::String(s2)) => s1 == s2,
+            (JsonValue::Null, JsonValue::Null) => true,
+            _ => false,
+        }
+    }
+}
+
 impl JsonValue
 {
     pub fn insert_map(&mut self, key: String, value: JsonValue) -> Result<(), &'static str>
