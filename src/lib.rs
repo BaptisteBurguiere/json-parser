@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::error::Error;
 
+#[derive(Clone)]
 pub enum JsonValue
 {
     Dict(HashMap<String, JsonValue>),
@@ -33,6 +34,26 @@ impl PartialEq for JsonValue
 
 impl JsonValue
 {
+    pub fn copy(&self) -> JsonValue
+    {
+        match self
+        {
+            JsonValue::Dict(map) => {
+                let copied_map = map.iter().map(|(k, v)| (k.clone(), v.copy())).collect();
+                JsonValue::Dict(copied_map)
+            }
+            JsonValue::List(vec) => {
+                let copied_vec = vec.iter().map(|v| v.copy()).collect();
+                JsonValue::List(copied_vec)
+            }
+            JsonValue::Bool(b) => JsonValue::Bool(*b),
+            JsonValue::Int(i) => JsonValue::Int(*i),
+            JsonValue::Double(d) => JsonValue::Double(*d),
+            JsonValue::String(s) => JsonValue::String(s.clone()),
+            JsonValue::Null => JsonValue::Null,
+        }
+    }
+
     pub fn insert_map(&mut self, key: String, value: JsonValue) -> Result<(), &'static str>
     {
         match self
